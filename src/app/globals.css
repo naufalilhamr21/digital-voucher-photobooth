@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Base mobile-first styling */
+html,
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent Chrome / Edge / Safari blue autofill background on inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+input.rounded-full:-webkit-autofill,
+input.rounded-full:-webkit-autofill:hover,
+input.rounded-full:-webkit-autofill:focus,
+input.rounded-full:-webkit-autofill:active {
+  border-radius: 9999px !important;
+}
+
+/* Safe Area Inset Utilities for mobile notches and home indicators */
+.pt-safe {
+  padding-top: max(0px, env(safe-area-inset-top));
+}
+
+.pb-safe {
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+.pl-safe {
+  padding-left: max(0px, env(safe-area-inset-left));
+}
+
+.pr-safe {
+  padding-right: max(0px, env(safe-area-inset-right));
+}
+
+/* Monospace token typography */
+.font-token {
+  font-family: var(--font-mono);
+  letter-spacing: 0.15em;
+}
+
+/* High contrast QR box */
+.qr-container {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08);
+}
+
+/* Ticket cutout styling */
+.ticket-cutout-left {
+  position: absolute;
+  left: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background-color: #f1f5f9;
+}
+
+.ticket-cutout-right {
+  position: absolute;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background-color: #f1f5f9;
+}
+
+/* Mobile Touch Optimization */
+button,
+a,
+input {
+  touch-action: manipulation;
+}
+
+/* Scanner target animation */
+@keyframes scanline {
+  0% {
+    top: 5%;
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 92%;
+    opacity: 0.8;
+  }
+}
+
+.animate-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: scanline 2s ease-in-out infinite alternate;
+}
