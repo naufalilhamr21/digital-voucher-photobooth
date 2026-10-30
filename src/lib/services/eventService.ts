@@ -2,6 +2,9 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { Event, EventStats, EventWithStats, Voucher } from '@/lib/types';
 import { globalStore } from './inMemoryStore';
 
+// In-memory pause timestamps tracker (fallback and precise duration tracker)
+const pauseTimestamps: Record<string, number> = {};
+
 export function calculateEventStats(event: Event, vouchers: Voucher[]): EventStats {
   const total_claimed = vouchers.length;
   const buffer_limit = event.quota + 20; // 15% - 20% buffer limit
@@ -270,31 +273,132 @@ export async function extendEventOvertime(eventId: string, additionalHours: numb
 
 export async function toggleEventStatus(eventId: string, forceActive?: boolean): Promise<Event | null> {
   const supabase = await createServerSupabaseClient();
+  const now = Date.now();
 
   if (supabase) {
-    const { data: current } = await supabase
+    const { data: current, error: fetchErr } = await supabase
       .from('events')
-      .select('is_active')
+      .select('*')
       .eq('id', eventId)
       .single();
 
+    if (fetchErr) {
+      console.error('Error fetching event for toggle:', fetchErr);
+    }
+
     if (current) {
       const newStatus = forceActive !== undefined ? forceActive : !current.is_active;
-      const { data: updated, error } = await supabase
-        .from('events')
-        .update({ is_active: newStatus })
-        .eq('id', eventId)
-        .select()
-        .single();
 
-      if (!error && updated) return updated;
+      if (!newStatus) {
+        // 1. Action: JEDA (PAUSE)
+        pauseTimestamps[eventId] = now;
+        const pauseIso = new Date(now).toISOString();
+
+        // Try updating with paused_at column first
+        const { data: updatedWithPause, error: pauseErr } = await supabase
+          .from('events')
+          .update({ is_active: false, paused_at: pauseIso })
+          .eq('id', eventId)
+          .select()
+          .single();
+
+        if (!pauseErr && updatedWithPause) return updatedWithPause;
+
+        // Fallback update without paused_at if column does not exist
+        const { data: updatedBasic, error: basicErr } = await supabase
+          .from('events')
+          .update({ is_active: false })
+          .eq('id', eventId)
+          .select()
+          .single();
+
+        if (basicErr) {
+          console.error('Error pausing event in Supabase:', basicErr);
+        }
+
+        if (updatedBasic) return updatedBasic;
+      } else {
+        // 2. Action: LANJUTKAN (RESUME) -> Hitung jeda dan perpanjang end_time otomatis
+        const pauseStart = current.paused_at
+          ? new Date(current.paused_at).getTime()
+          : pauseTimestamps[eventId];
+
+        let newEndTime = current.end_time;
+
+        if (pauseStart) {
+          const pauseDurationMs = Math.max(0, now - pauseStart);
+          if (pauseDurationMs >= 1000) {
+            const currentEndMs = new Date(current.end_time).getTime();
+            newEndTime = new Date(currentEndMs + pauseDurationMs).toISOString();
+          }
+        }
+
+        // Try updating with paused_at: null and extended end_time
+        // Note: duration_hours is INTEGER in DB schema, so end_time is extended without modifying duration_hours
+        const { data: updatedWithResume, error: resumeErr } = await supabase
+          .from('events')
+          .update({
+            is_active: true,
+            end_time: newEndTime,
+            paused_at: null,
+          })
+          .eq('id', eventId)
+          .select()
+          .single();
+
+        if (!resumeErr && updatedWithResume) {
+          delete pauseTimestamps[eventId];
+          return updatedWithResume;
+        }
+
+        // Fallback update without paused_at (if paused_at column does not exist)
+        const { data: updatedBasicResume, error: basicResumeErr } = await supabase
+          .from('events')
+          .update({
+            is_active: true,
+            end_time: newEndTime,
+          })
+          .eq('id', eventId)
+          .select()
+          .single();
+
+        if (basicResumeErr) {
+          console.error('Error resuming event in Supabase:', basicResumeErr);
+        }
+
+        if (updatedBasicResume) {
+          delete pauseTimestamps[eventId];
+          return updatedBasicResume;
+        }
+      }
     }
   }
 
-  // Fallback in-memory
+  // Fallback in-memory store
   const target = globalStore.events.find((e) => e.id === eventId);
   if (!target) return null;
 
-  target.is_active = forceActive !== undefined ? forceActive : !target.is_active;
+  const newStatus = forceActive !== undefined ? forceActive : !target.is_active;
+
+  if (!newStatus) {
+    target.is_active = false;
+    target.paused_at = new Date(now).toISOString();
+    pauseTimestamps[eventId] = now;
+  } else {
+    target.is_active = true;
+    const pauseStart = target.paused_at
+      ? new Date(target.paused_at).getTime()
+      : pauseTimestamps[eventId];
+
+    if (pauseStart) {
+      const pauseDurationMs = Math.max(0, now - pauseStart);
+      if (pauseDurationMs >= 1000) {
+        target.end_time = new Date(new Date(target.end_time).getTime() + pauseDurationMs).toISOString();
+      }
+      target.paused_at = null;
+      delete pauseTimestamps[eventId];
+    }
+  }
+
   return target;
 }

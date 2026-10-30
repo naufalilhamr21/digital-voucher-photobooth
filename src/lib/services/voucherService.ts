@@ -17,7 +17,7 @@ export async function claimVoucher(eventSlug: string): Promise<ClaimResult> {
   if (!event.is_active) {
     return {
       success: false,
-      message: 'Event ini telah ditutup. Voucher tidak lagi dapat diklaim.',
+      message: 'Sesi event ini sedang dijeda sementara oleh admin.',
     };
   }
 
@@ -102,7 +102,7 @@ export async function redeemVoucher(eventSlug: string, rawToken: string): Promis
   if (!event.is_active) {
     return {
       status: 'event_inactive',
-      message: 'Event ini sedang non-aktif / ditutup oleh admin.',
+      message: 'Sesi event ini sedang dijeda sementara oleh admin.',
     };
   }
 

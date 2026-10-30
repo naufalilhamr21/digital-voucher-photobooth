@@ -8,6 +8,7 @@ export interface Event {
   duration_hours: number;
   is_active: boolean;
   pin_code: string;
+  paused_at?: string | null;
   created_at: string;
 }
 

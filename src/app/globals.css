@@ -90,11 +90,21 @@ input.rounded-full:-webkit-autofill:active {
   background-color: #f1f5f9;
 }
 
-/* Mobile Touch Optimization */
+/* Mobile Touch Optimization & Button Cursor */
 button,
 a,
 input {
   touch-action: manipulation;
+}
+
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"]:disabled {
+  cursor: not-allowed;
 }
 
 /* Scanner target animation */

@@ -52,6 +52,18 @@ export async function PATCH(
 
     // Action: edit event details
     if (action === 'edit') {
+      const now = Date.now();
+      const startMs = new Date(event.start_time).getTime();
+      if (now >= startMs) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Event yang sedang berjalan atau sudah selesai tidak dapat diedit.',
+          },
+          { status: 400 }
+        );
+      }
+
       const updated = await updateEvent(event.id, {
         event_name,
         quota,
@@ -86,12 +98,27 @@ export async function PATCH(
       });
     }
 
-    // Action: Toggle active status (Tutup / Buka Event)
+    // Action: Toggle active status (Jeda / Lanjutkan Event)
     if (action === 'toggle_status') {
-      const updated = await toggleEventStatus(event.id);
+      const forceActive =
+        typeof body.target_active === 'boolean' ? body.target_active : undefined;
+      const updated = await toggleEventStatus(event.id, forceActive);
+
+      if (!updated) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Gagal memperbarui status event di database.',
+          },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json({
         success: true,
-        message: updated?.is_active ? 'Event berhasil diaktifkan kembali.' : 'Event telah ditutup.',
+        message: updated.is_active
+          ? 'Event berhasil dilanjutkan. Waktu selesai otomatis disesuaikan.'
+          : 'Event berhasil dijeda sementara.',
         event: updated,
       });
     }
@@ -121,6 +148,18 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, message: 'Event tidak ditemukan.' },
         { status: 404 }
+      );
+    }
+
+    const now = Date.now();
+    const startMs = new Date(event.start_time).getTime();
+    if (now >= startMs) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Event yang sedang berjalan atau sudah selesai tidak dapat dihapus.',
+        },
+        { status: 400 }
       );
     }
 
